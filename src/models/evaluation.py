@@ -17,7 +17,6 @@ from typing import Any
 
 import numpy as np
 import pandas as pd
-import shap
 from sklearn.metrics import (
     accuracy_score,
     brier_score_loss,
@@ -130,6 +129,8 @@ def compute_shap_explanations(
         X_sample = X[indices] if isinstance(X, np.ndarray) else X.iloc[indices]
     else:
         X_sample = X
+
+    import shap
 
     explainer = shap.TreeExplainer(model)
     shap_values = explainer.shap_values(X_sample)
