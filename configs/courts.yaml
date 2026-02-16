@@ -1,0 +1,56 @@
+# Kenya Court Code Mappings
+# Source: Tausi API /api/v1/courts endpoint
+# FRBR URI prefix: /akn/ke/judgment/{court_code}/{year}/{number}
+
+courts:
+  kehc:
+    name: "High Court of Kenya"
+    hierarchy: 3  # 1=Supreme, 2=Appeal, 3=High Court
+    stations:
+      HCNRB:
+        name: "Milimani High Court, Nairobi"
+        divisions:
+          - "Commercial & Tax"
+          - "Civil"
+          - "Criminal"
+          - "Constitutional & Human Rights"
+          - "Judicial Review"
+          - "Family"
+      HCMSA:
+        name: "High Court, Mombasa"
+      HCKIS:
+        name: "High Court, Kisumu"
+      HCELD:
+        name: "High Court, Eldoret"
+      HCNKR:
+        name: "High Court, Nakuru"
+
+  keca:
+    name: "Court of Appeal of Kenya"
+    hierarchy: 2
+    stations:
+      CANRB:
+        name: "Court of Appeal, Nairobi"
+      CAMSA:
+        name: "Court of Appeal, Mombasa"
+      CAKIS:
+        name: "Court of Appeal, Kisumu"
+
+  kepc:
+    name: "Supreme Court of Kenya"
+    hierarchy: 1
+    stations:
+      SCNRB:
+        name: "Supreme Court, Nairobi"
+
+  # Employment and Labour Relations Court
+  kelrc:
+    name: "Employment & Labour Relations Court"
+    hierarchy: 3
+
+  # Environment and Land Court
+  keelc:
+    name: "Environment & Land Court"
+    hierarchy: 3
+
+# Focus for this project: kehc/HCNRB (Milimani Commercial Division)

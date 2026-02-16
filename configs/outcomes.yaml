@@ -1,0 +1,71 @@
+# Outcome Taxonomy for Kenyan Court Judgments
+#
+# Built from actual Kenya Law judgment analysis.
+# This taxonomy maps raw outcome signals extracted from judgment text
+# to binary labels for ML prediction.
+#
+# IMPORTANT: This must be validated by a Kenyan legal domain expert
+# before use in model training. See notebooks/03_outcome_labeling.ipynb.
+
+# Regex patterns for outcome extraction (applied to last 20% of judgment text)
+# Each pattern has a confidence weight; cases below threshold need manual review.
+extraction_patterns:
+  high_confidence:  # confidence >= 0.9
+    - pattern: "(?i)application\\s+is\\s+(hereby\\s+)?allowed"
+      outcome: APPLICATION_ALLOWED
+    - pattern: "(?i)application\\s+is\\s+(hereby\\s+)?dismissed"
+      outcome: APPLICATION_DISMISSED
+    - pattern: "(?i)judgment\\s+(is\\s+)?(hereby\\s+)?entered\\s+for\\s+the\\s+plaintiff"
+      outcome: JUDGMENT_FOR_PLAINTIFF
+    - pattern: "(?i)judgment\\s+(is\\s+)?(hereby\\s+)?entered\\s+for\\s+the\\s+defendant"
+      outcome: JUDGMENT_FOR_DEFENDANT
+    - pattern: "(?i)appeal\\s+is\\s+(hereby\\s+)?allowed"
+      outcome: APPEAL_ALLOWED
+    - pattern: "(?i)appeal\\s+is\\s+(hereby\\s+)?dismissed"
+      outcome: APPEAL_DISMISSED
+
+  medium_confidence:  # confidence >= 0.7
+    - pattern: "(?i)suit\\s+is\\s+(hereby\\s+)?dismissed"
+      outcome: SUIT_DISMISSED
+    - pattern: "(?i)case\\s+is\\s+(hereby\\s+)?struck\\s+(out|off)"
+      outcome: STRUCK_OUT
+    - pattern: "(?i)claim\\s+succeeds"
+      outcome: JUDGMENT_FOR_PLAINTIFF
+    - pattern: "(?i)claim\\s+fails"
+      outcome: JUDGMENT_FOR_DEFENDANT
+    - pattern: "(?i)petition\\s+is\\s+(hereby\\s+)?allowed"
+      outcome: APPLICATION_ALLOWED
+    - pattern: "(?i)petition\\s+is\\s+(hereby\\s+)?dismissed"
+      outcome: APPLICATION_DISMISSED
+
+  low_confidence:  # confidence < 0.7, always flagged for review
+    - pattern: "(?i)by\\s+consent"
+      outcome: CONSENT_ORDER
+    - pattern: "(?i)withdrawn"
+      outcome: WITHDRAWN
+    - pattern: "(?i)partly\\s+(succeeds|allowed)"
+      outcome: PARTIAL
+
+# Binary label mapping
+binary_mapping:
+  positive:  # outcome_binary = 1 (plaintiff/applicant success)
+    - APPLICATION_ALLOWED
+    - JUDGMENT_FOR_PLAINTIFF
+    - APPEAL_ALLOWED
+  negative:  # outcome_binary = 0 (defendant/respondent success)
+    - APPLICATION_DISMISSED
+    - JUDGMENT_FOR_DEFENDANT
+    - SUIT_DISMISSED
+    - STRUCK_OUT
+    - APPEAL_DISMISSED
+  excluded:  # Not used in binary classification
+    - CONSENT_ORDER
+    - WITHDRAWN
+    - PARTIAL
+    - UNDETERMINED
+
+# Manual review threshold
+confidence_threshold: 0.7
+
+# Inter-annotator agreement target
+target_cohens_kappa: 0.80
