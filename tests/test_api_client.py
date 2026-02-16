@@ -1,9 +1,8 @@
 """Tests for Tausi API client."""
 
 import pytest
-from unittest.mock import AsyncMock, patch
 
-from src.data.api_client import TausiClient, CircuitBreakerOpen
+from src.data.api_client import CircuitBreakerOpen, TausiClient
 
 
 class TestTausiClient:

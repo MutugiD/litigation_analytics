@@ -56,14 +56,15 @@ def extract_with_ocr(pdf_path: Path) -> str | None:
 
         doc = fitz.open(str(pdf_path))
         text_parts = []
-        for page_num, page in enumerate(doc):
+        for _page_num, page in enumerate(doc):
             # Render page as image at 300 DPI
             pix = page.get_pixmap(dpi=300)
             img_bytes = pix.tobytes("png")
 
             # OCR the image
-            from PIL import Image
             import io
+
+            from PIL import Image
 
             img = Image.open(io.BytesIO(img_bytes))
             page_text = pytesseract.image_to_string(img)

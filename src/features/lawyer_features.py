@@ -23,8 +23,6 @@ import re
 import numpy as np
 import pandas as pd
 
-from configs.settings import settings
-
 logger = logging.getLogger(__name__)
 
 # Regex patterns for extracting advocate names from Kenyan judgment text
@@ -134,16 +132,12 @@ def compute_lawyer_win_rates(
         # Plaintiff advocates: they "win" when outcome_binary == 1
         for name in row.get("plaintiff_advocates", []) or []:
             if name:
-                lawyer_records.setdefault(name, []).append(
-                    {"won": outcome == 1, "year": year}
-                )
+                lawyer_records.setdefault(name, []).append({"won": outcome == 1, "year": year})
 
         # Defendant advocates: they "win" when outcome_binary == 0
         for name in row.get("defendant_advocates", []) or []:
             if name:
-                lawyer_records.setdefault(name, []).append(
-                    {"won": outcome == 0, "year": year}
-                )
+                lawyer_records.setdefault(name, []).append({"won": outcome == 0, "year": year})
 
     # Compute features per lawyer
     lawyer_features = {}
@@ -163,7 +157,8 @@ def compute_lawyer_win_rates(
 
     logger.info(
         "Computed features for %d lawyers (global rate: %.3f)",
-        len(lawyer_features), global_rate,
+        len(lawyer_features),
+        global_rate,
     )
     return lawyer_features
 
@@ -218,8 +213,7 @@ def build_lawyer_features(df: pd.DataFrame) -> pd.DataFrame:
     features["num_plaintiff_advocates"] = n_p_advocates
     features["num_defendant_advocates"] = n_d_advocates
     features["has_advocate_data"] = (
-        (features["num_plaintiff_advocates"] > 0) |
-        (features["num_defendant_advocates"] > 0)
+        (features["num_plaintiff_advocates"] > 0) | (features["num_defendant_advocates"] > 0)
     ).astype(int)
 
     logger.info(

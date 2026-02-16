@@ -60,9 +60,11 @@ class OutcomeParser:
 
     def __init__(self, config_path: Path | None = None):
         if config_path is None:
-            config_path = Path(__file__).resolve().parent.parent.parent / "configs" / "outcomes.yaml"
+            config_path = (
+                Path(__file__).resolve().parent.parent.parent / "configs" / "outcomes.yaml"
+            )
 
-        with open(config_path, "r", encoding="utf-8") as f:
+        with open(config_path, encoding="utf-8") as f:
             config = yaml.safe_load(f)
 
         self.rules: list[PatternRule] = []
@@ -174,7 +176,9 @@ class OutcomeParser:
         if len(unique_labels) > 1:
             logger.info(
                 "Conflicting outcomes detected: %s (chose %s at %.2f)",
-                unique_labels, result.label, result.confidence,
+                unique_labels,
+                result.label,
+                result.confidence,
             )
             result.needs_review = True
 

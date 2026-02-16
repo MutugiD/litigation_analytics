@@ -20,7 +20,7 @@ import numpy as np
 import optuna
 import pandas as pd
 import xgboost as xgb
-from sklearn.metrics import accuracy_score, roc_auc_score, brier_score_loss
+from sklearn.metrics import accuracy_score, brier_score_loss, roc_auc_score
 
 from configs.settings import settings
 
@@ -116,7 +116,11 @@ def train_xgboost(
 
     logger.info(
         "Training XGBoost: %d features (text=%s), %d train, %d val, %d test",
-        len(feature_cols), include_text, len(train_df), len(val_df), len(test_df),
+        len(feature_cols),
+        include_text,
+        len(train_df),
+        len(val_df),
+        len(test_df),
     )
 
     dtrain = _prepare_dmatrix(train_df, feature_cols, target_col)
@@ -139,12 +143,14 @@ def train_xgboost(
 
         best_params = study.best_params
         n_estimators = best_params.pop("n_estimators")
-        best_params.update({
-            "objective": "binary:logistic",
-            "eval_metric": "auc",
-            "tree_method": "hist",
-            "verbosity": 0,
-        })
+        best_params.update(
+            {
+                "objective": "binary:logistic",
+                "eval_metric": "auc",
+                "tree_method": "hist",
+                "verbosity": 0,
+            }
+        )
 
         logger.info("Best params: %s (n_estimators=%d)", best_params, n_estimators)
         mlflow.log_params(best_params)

@@ -71,8 +71,7 @@ def two_proportion_z_test(
 
     # 95% CI for the difference
     se_diff = np.sqrt(
-        p_control * (1 - p_control) / n_control +
-        p_treatment * (1 - p_treatment) / n_treatment
+        p_control * (1 - p_control) / n_control + p_treatment * (1 - p_treatment) / n_treatment
     )
     z_crit = stats.norm.ppf(1 - alpha / 2)
     ci = (
@@ -119,7 +118,9 @@ def paired_t_test_time(
     relative_diff = (absolute_diff / control_mean * 100) if control_mean > 0 else 0
 
     # 95% CI for the difference
-    se = np.sqrt(control_times.var() / len(control_times) + treatment_times.var() / len(treatment_times))
+    se = np.sqrt(
+        control_times.var() / len(control_times) + treatment_times.var() / len(treatment_times)
+    )
     z_crit = stats.norm.ppf(1 - alpha / 2)
     ci = (absolute_diff - z_crit * se, absolute_diff + z_crit * se)
 
@@ -160,8 +161,8 @@ def mixed_effects_regression(
     """
     try:
         import statsmodels.api as sm
-        from statsmodels.genmod.generalized_estimating_equations import GEE
         from statsmodels.genmod.families import Binomial
+        from statsmodels.genmod.generalized_estimating_equations import GEE
 
         if fixed_effects is None:
             fixed_effects = [treatment_col]
@@ -254,9 +255,7 @@ def analyze_experiment(
     # Roll-out decision
     accuracy_pass = accuracy_result.significant and accuracy_result.absolute_diff > 0
     time_pass = (
-        time_result is not None
-        and time_result.significant
-        and time_result.relative_diff_pct >= 30
+        time_result is not None and time_result.significant and time_result.relative_diff_pct >= 30
     )
 
     if accuracy_pass and time_pass:

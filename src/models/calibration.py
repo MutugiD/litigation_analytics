@@ -15,7 +15,6 @@ Usage:
 import logging
 
 import numpy as np
-from sklearn.calibration import CalibratedClassifierCV
 from sklearn.isotonic import IsotonicRegression
 from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import brier_score_loss
@@ -48,9 +47,7 @@ class CalibratedModel:
             self._calibrator = LogisticRegression(C=1e10, solver="lbfgs", max_iter=10000)
             self._calibrator.fit(raw_probs.reshape(-1, 1), true_labels)
         else:
-            self._calibrator = IsotonicRegression(
-                y_min=0.0, y_max=1.0, out_of_bounds="clip"
-            )
+            self._calibrator = IsotonicRegression(y_min=0.0, y_max=1.0, out_of_bounds="clip")
             self._calibrator.fit(raw_probs, true_labels)
 
         # Report calibration improvement

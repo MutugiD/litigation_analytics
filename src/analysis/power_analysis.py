@@ -62,8 +62,8 @@ def compute_sample_size(
     if p_treatment <= p_control:
         raise ValueError("Treatment proportion must exceed control proportion.")
 
-    # Effect size (Cohen's h)
-    h = 2 * np.arcsin(np.sqrt(p_treatment)) - 2 * np.arcsin(np.sqrt(p_control))
+    # Effect size (Cohen's h) - used in formula derivation, kept for documentation
+    _h = 2 * np.arcsin(np.sqrt(p_treatment)) - 2 * np.arcsin(np.sqrt(p_control))
 
     # Z-values
     z_alpha = stats.norm.ppf(1 - alpha / 2)  # two-sided
@@ -73,9 +73,10 @@ def compute_sample_size(
     p_bar = (p_control + ratio * p_treatment) / (1 + ratio)
     q_bar = 1 - p_bar
 
-    numerator = (z_alpha * np.sqrt((1 + 1 / ratio) * p_bar * q_bar) +
-                 z_beta * np.sqrt(p_control * (1 - p_control) +
-                                  p_treatment * (1 - p_treatment) / ratio)) ** 2
+    numerator = (
+        z_alpha * np.sqrt((1 + 1 / ratio) * p_bar * q_bar)
+        + z_beta * np.sqrt(p_control * (1 - p_control) + p_treatment * (1 - p_treatment) / ratio)
+    ) ** 2
     denominator = (p_treatment - p_control) ** 2
 
     n_control = int(np.ceil(numerator / denominator))
@@ -98,7 +99,11 @@ def compute_sample_size(
 
     logger.info(
         "Power analysis: %.1f%% -> %.1f%% (%.1f pp lift), n=%d per arm, total=%d",
-        p_control * 100, p_treatment * 100, absolute_lift, result.n_per_arm, result.total_n,
+        p_control * 100,
+        p_treatment * 100,
+        absolute_lift,
+        result.n_per_arm,
+        result.total_n,
     )
     return result
 
@@ -126,11 +131,13 @@ def compute_power_curve(
             continue
         try:
             result = compute_sample_size(p_control, p_treatment, alpha, power)
-            results.append({
-                "effect_size_pp": delta,
-                "n_per_arm": result.n_per_arm,
-                "total_n": result.total_n,
-            })
+            results.append(
+                {
+                    "effect_size_pp": delta,
+                    "n_per_arm": result.n_per_arm,
+                    "total_n": result.total_n,
+                }
+            )
         except ValueError:
             continue
 
@@ -155,21 +162,21 @@ def power_report(
         "=" * 60,
         "POWER ANALYSIS REPORT",
         "=" * 60,
-        f"",
+        "",
         f"Hypothesis: Treatment accuracy ({p_treatment:.1%}) > Control accuracy ({p_control:.1%})",
         f"Absolute lift: {result.absolute_lift_pp:.1f} percentage points",
         f"Relative lift: {result.relative_lift_pct:.1f}%",
-        f"",
-        f"Parameters:",
+        "",
+        "Parameters:",
         f"  Significance level (alpha): {alpha}",
         f"  Statistical power (1-beta): {power}",
-        f"  Test: Two-proportion Z-test (two-sided)",
-        f"",
-        f"Required sample size:",
+        "  Test: Two-proportion Z-test (two-sided)",
+        "",
+        "Required sample size:",
         f"  Per arm: {result.n_per_arm} cases",
         f"  Total (both arms): {result.total_n} cases",
         f"  With 10% dropout buffer: {int(result.total_n * 1.1)} cases",
-        f"",
+        "",
         f"Sensitivity table (baseline = {p_control:.1%}):",
         f"  {'Lift (pp)':>10} | {'N per arm':>10} | {'Total N':>10}",
         f"  {'-' * 10}-+-{'-' * 10}-+-{'-' * 10}",
@@ -180,16 +187,18 @@ def power_report(
             f"  {row['effect_size_pp']:>10.1f} | {row['n_per_arm']:>10d} | {row['total_n']:>10d}"
         )
 
-    lines.extend([
-        f"",
-        f"IMPORTANT NOTES:",
-        f"  - The baseline accuracy ({p_control:.1%}) must be empirically validated",
-        f"    during shadow mode (Phase 5), NOT assumed.",
-        f"  - These are PROSPECTIVE cases requiring real lawyer predictions,",
-        f"    separate from the historical training data.",
-        f"  - At ~5-10 new cases per week, collecting {result.n_per_arm} cases per arm",
-        f"    takes {result.n_per_arm // 5}-{result.n_per_arm // 10} weeks.",
-        "=" * 60,
-    ])
+    lines.extend(
+        [
+            "",
+            "IMPORTANT NOTES:",
+            f"  - The baseline accuracy ({p_control:.1%}) must be empirically validated",
+            "    during shadow mode (Phase 5), NOT assumed.",
+            "  - These are PROSPECTIVE cases requiring real lawyer predictions,",
+            "    separate from the historical training data.",
+            f"  - At ~5-10 new cases per week, collecting {result.n_per_arm} cases per arm",
+            f"    takes {result.n_per_arm // 5}-{result.n_per_arm // 10} weeks.",
+            "=" * 60,
+        ]
+    )
 
     return "\n".join(lines)

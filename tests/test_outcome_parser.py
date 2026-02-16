@@ -1,8 +1,9 @@
 """Tests for outcome extraction from judgment text."""
 
 import pytest
-from src.features.outcome_parser import OutcomeParser
+
 from src.data.validators import OutcomeLabel
+from src.features.outcome_parser import OutcomeParser
 
 
 @pytest.fixture

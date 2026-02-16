@@ -21,6 +21,7 @@ from pathlib import Path
 import numpy as np
 from fastapi import FastAPI, HTTPException
 
+from configs.settings import settings
 from src.api.schemas import (
     FeatureContribution,
     HealthResponse,
@@ -28,7 +29,6 @@ from src.api.schemas import (
     PredictionRequest,
     PredictionResponse,
 )
-from configs.settings import settings
 
 logger = logging.getLogger(__name__)
 
@@ -79,7 +79,9 @@ def _load_model():
             k: v for k, v in best_run.data.metrics.items() if k.startswith("test_")
         }
 
-        logger.info("Loaded model: run=%s, metrics=%s", best_run.info.run_id, _model_state["test_metrics"])
+        logger.info(
+            "Loaded model: run=%s, metrics=%s", best_run.info.run_id, _model_state["test_metrics"]
+        )
 
     except Exception as e:
         logger.error("Failed to load model from MLflow: %s", e)

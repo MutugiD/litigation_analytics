@@ -17,7 +17,6 @@ Features:
 
 import logging
 import re
-from datetime import date
 
 import numpy as np
 import pandas as pd
@@ -42,10 +41,23 @@ AMOUNT_PATTERNS = [
 
 # Word-to-number mapping for Kenyan legal text
 WORD_NUMBERS = {
-    "one": 1, "two": 2, "three": 3, "four": 4, "five": 5,
-    "six": 6, "seven": 7, "eight": 8, "nine": 9, "ten": 10,
-    "twenty": 20, "thirty": 30, "forty": 40, "fifty": 50,
-    "hundred": 100, "thousand": 1_000, "million": 1_000_000,
+    "one": 1,
+    "two": 2,
+    "three": 3,
+    "four": 4,
+    "five": 5,
+    "six": 6,
+    "seven": 7,
+    "eight": 8,
+    "nine": 9,
+    "ten": 10,
+    "twenty": 20,
+    "thirty": 30,
+    "forty": 40,
+    "fifty": 50,
+    "hundred": 100,
+    "thousand": 1_000,
+    "million": 1_000_000,
     "billion": 1_000_000_000,
 }
 
@@ -114,7 +126,9 @@ def compute_judge_win_rates(
 
     logger.info(
         "Computed win rates for %d judges (global rate: %.3f, min_cases: %d)",
-        len(judge_rates), global_rate, min_cases,
+        len(judge_rates),
+        global_rate,
+        min_cases,
     )
     return judge_rates
 
@@ -166,9 +180,7 @@ def build_tabular_features(df: pd.DataFrame) -> pd.DataFrame:
         features["judge_win_rate"] = df["primary_judge"].map(judge_rates).values
 
     # Log-transformed claim amount (for scale normalization)
-    features["log_claim_amount"] = np.log1p(
-        features["claim_amount_kes"].fillna(0)
-    )
+    features["log_claim_amount"] = np.log1p(features["claim_amount_kes"].fillna(0))
 
     # --- Lawyer features (from PDF extraction + API) ---
     # Literature: counsel characteristics are among the top predictors
@@ -188,6 +200,7 @@ def build_tabular_features(df: pd.DataFrame) -> pd.DataFrame:
 
     logger.info(
         "Built tabular features: %d cases x %d features",
-        len(features), len(features.columns),
+        len(features),
+        len(features.columns),
     )
     return features

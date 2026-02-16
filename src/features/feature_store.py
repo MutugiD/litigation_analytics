@@ -117,8 +117,11 @@ class FeatureStore:
 
         logger.info(
             "Temporal split: train=%d (%s), val=%d (%s), test=%d (%s)",
-            len(train), cfg.train_years,
-            len(val), cfg.val_years,
-            len(test), cfg.test_years,
+            len(train),
+            cfg.train_years,
+            len(val),
+            cfg.val_years,
+            len(test),
+            cfg.test_years,
         )
         return train, val, test

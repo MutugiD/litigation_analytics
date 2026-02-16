@@ -4,7 +4,7 @@ import numpy as np
 import pytest
 
 from src.models.calibration import CalibratedModel, reliability_diagram_data
-from src.models.evaluation import compute_metrics, compute_fairness, check_gates
+from src.models.evaluation import check_gates, compute_fairness, compute_metrics
 
 
 class TestComputeMetrics:

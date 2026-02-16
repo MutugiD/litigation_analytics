@@ -20,18 +20,17 @@ Usage:
 import logging
 
 import mlflow
-import numpy as np
 import optuna
 import pandas as pd
 from sklearn.compose import ColumnTransformer
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.impute import SimpleImputer
-from sklearn.metrics import accuracy_score, roc_auc_score, brier_score_loss
+from sklearn.metrics import accuracy_score, brier_score_loss, roc_auc_score
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import OneHotEncoder, StandardScaler
 
 from configs.settings import settings
-from src.models.baseline import NUMERIC_FEATURES, BINARY_FEATURES, CATEGORICAL_FEATURES
+from src.models.baseline import BINARY_FEATURES, CATEGORICAL_FEATURES, NUMERIC_FEATURES
 
 logger = logging.getLogger(__name__)
 
@@ -83,23 +82,44 @@ def train_random_forest(
 
     logger.info(
         "Training Random Forest: %d features, %d train, %d val, %d test",
-        len(all_features), len(X_train), len(X_val), len(X_test),
+        len(all_features),
+        len(X_train),
+        len(X_val),
+        len(X_test),
     )
 
     # Build preprocessing pipeline
     preprocessor = ColumnTransformer(
         transformers=[
-            ("num", Pipeline([
-                ("imputer", SimpleImputer(strategy="median")),
-                ("scaler", StandardScaler()),
-            ]), avail_numeric),
-            ("bin", Pipeline([
-                ("imputer", SimpleImputer(strategy="constant", fill_value=0)),
-            ]), avail_binary),
-            ("cat", Pipeline([
-                ("imputer", SimpleImputer(strategy="constant", fill_value="unknown")),
-                ("onehot", OneHotEncoder(handle_unknown="ignore", sparse_output=False)),
-            ]), avail_cat),
+            (
+                "num",
+                Pipeline(
+                    [
+                        ("imputer", SimpleImputer(strategy="median")),
+                        ("scaler", StandardScaler()),
+                    ]
+                ),
+                avail_numeric,
+            ),
+            (
+                "bin",
+                Pipeline(
+                    [
+                        ("imputer", SimpleImputer(strategy="constant", fill_value=0)),
+                    ]
+                ),
+                avail_binary,
+            ),
+            (
+                "cat",
+                Pipeline(
+                    [
+                        ("imputer", SimpleImputer(strategy="constant", fill_value="unknown")),
+                        ("onehot", OneHotEncoder(handle_unknown="ignore", sparse_output=False)),
+                    ]
+                ),
+                avail_cat,
+            ),
         ],
         remainder="drop",
     )
@@ -112,19 +132,22 @@ def train_random_forest(
                 "max_depth": trial.suggest_int("max_depth", 3, 15),
                 "min_samples_split": trial.suggest_int("min_samples_split", 2, 20),
                 "min_samples_leaf": trial.suggest_int("min_samples_leaf", 1, 10),
-                "max_features": trial.suggest_categorical(
-                    "max_features", ["sqrt", "log2", None]
-                ),
+                "max_features": trial.suggest_categorical("max_features", ["sqrt", "log2", None]),
             }
 
-            pipeline = Pipeline([
-                ("preprocess", preprocessor),
-                ("classifier", RandomForestClassifier(
-                    **params,
-                    random_state=42,
-                    n_jobs=-1,
-                )),
-            ])
+            pipeline = Pipeline(
+                [
+                    ("preprocess", preprocessor),
+                    (
+                        "classifier",
+                        RandomForestClassifier(
+                            **params,
+                            random_state=42,
+                            n_jobs=-1,
+                        ),
+                    ),
+                ]
+            )
             pipeline.fit(X_train, y_train)
             val_probs = pipeline.predict_proba(X_val)[:, 1]
             return roc_auc_score(y_val, val_probs)
@@ -139,14 +162,19 @@ def train_random_forest(
         mlflow.log_param("features", all_features)
 
         # --- Train final model with best params ---
-        pipeline = Pipeline([
-            ("preprocess", preprocessor),
-            ("classifier", RandomForestClassifier(
-                **best_params,
-                random_state=42,
-                n_jobs=-1,
-            )),
-        ])
+        pipeline = Pipeline(
+            [
+                ("preprocess", preprocessor),
+                (
+                    "classifier",
+                    RandomForestClassifier(
+                        **best_params,
+                        random_state=42,
+                        n_jobs=-1,
+                    ),
+                ),
+            ]
+        )
         pipeline.fit(X_train, y_train)
 
         # --- Validation metrics ---
@@ -176,10 +204,13 @@ def train_random_forest(
         preprocess = pipeline.named_steps["preprocess"]
         try:
             feature_names = preprocess.get_feature_names_out()
-            importance = dict(zip(
-                [str(f) for f in feature_names],
-                [float(v) for v in rf.feature_importances_],
-            ))
+            importance = dict(
+                zip(
+                    [str(f) for f in feature_names],
+                    [float(v) for v in rf.feature_importances_],
+                    strict=False,
+                )
+            )
             mlflow.log_dict(importance, "feature_importance.json")
         except Exception:
             logger.warning("Could not extract feature names for importance logging")
