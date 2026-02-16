@@ -59,9 +59,7 @@ async def download_year(
 
             # Download PDF if available
             if download_pdfs and decision.frbr_uri:
-                pdf_url = (
-                    f"{client.base_url}/decisions{decision.frbr_uri}.pdf"
-                )
+                pdf_url = f"{client.base_url}/decisions{decision.frbr_uri}.pdf"
                 pdf_path = year_dir / f"{case_id}.pdf"
                 try:
                     await client.download_file(pdf_url, pdf_path)
@@ -101,7 +99,10 @@ async def download_all(
 
     logger.info(
         "Starting download: court=%s, years=%d-%d, pdfs=%s",
-        court, year_start, year_end, download_pdfs,
+        court,
+        year_start,
+        year_end,
+        download_pdfs,
     )
 
     all_stats = []
@@ -117,9 +118,7 @@ async def download_all(
 
         # Download year by year (sequential to respect rate limits)
         for year in tqdm(range(year_start, year_end + 1), desc="Years"):
-            stats = await download_year(
-                client, year, court, output_dir, download_pdfs
-            )
+            stats = await download_year(client, year, court, output_dir, download_pdfs)
             all_stats.append(stats)
             logger.info("Year %d complete: %s", year, stats)
 

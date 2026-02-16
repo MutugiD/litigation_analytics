@@ -1,12 +1,13 @@
 """Tests for data validation models."""
 
 import pytest
+
 from src.data.validators import (
-    TausiDecisionRaw,
+    NEGATIVE_OUTCOMES,
+    POSITIVE_OUTCOMES,
     CaseRecord,
     OutcomeLabel,
-    POSITIVE_OUTCOMES,
-    NEGATIVE_OUTCOMES,
+    TausiDecisionRaw,
 )
 
 
@@ -100,7 +101,7 @@ class TestCaseRecord:
 
     def test_filing_year_validation(self):
         """Out-of-range filing years are rejected."""
-        with pytest.raises(Exception):
+        with pytest.raises(ValueError):
             CaseRecord(
                 case_id="TEST",
                 frbr_uri="/test",

@@ -22,8 +22,7 @@ Usage:
 import logging
 import re
 import time
-from dataclasses import dataclass, field, asdict
-from pathlib import Path
+from dataclasses import asdict, dataclass, field
 
 import httpx
 
@@ -35,6 +34,7 @@ BASE_URL = "https://new.kenyalaw.org"
 @dataclass
 class ScrapedCase:
     """A single scraped case with all metadata."""
+
     case_id: str = ""
     frbr_uri: str = ""
     citation: str = ""
@@ -109,7 +109,7 @@ class KenyaLawScraper:
         html = self._get(url)
 
         # Extract case links with the eng@date suffix
-        pattern = rf'/akn/ke/judgment/{court.lower()}/{year}/\d+/eng@[\d-]+'
+        pattern = rf"/akn/ke/judgment/{court.lower()}/{year}/\d+/eng@[\d-]+"
         links = list(set(re.findall(pattern, html)))
         links.sort()
         logger.info("Page %d of %s/%d: found %d case links", page, court, year, len(links))
@@ -125,7 +125,9 @@ class KenyaLawScraper:
             if not links:
                 break
             all_links.extend(links)
-            logger.info("Year %d page %d: %d links (total: %d)", year, page, len(links), len(all_links))
+            logger.info(
+                "Year %d page %d: %d links (total: %d)", year, page, len(links), len(all_links)
+            )
         return all_links
 
     # -----------------------------------------------------------------
@@ -143,7 +145,7 @@ class KenyaLawScraper:
         case = ScrapedCase(page_url=url)
 
         # FRBR URI and case_id
-        uri_match = re.search(r'/akn/ke/judgment/(\w+)/(\d{4})/(\d+)', path)
+        uri_match = re.search(r"/akn/ke/judgment/(\w+)/(\d{4})/(\d+)", path)
         if uri_match:
             court = uri_match.group(1)
             year = uri_match.group(2)
@@ -172,14 +174,14 @@ class KenyaLawScraper:
         # Judges - from metadata and from akn-div
         judge_text = metadata.get("Judges", "")
         if judge_text:
-            case.judges = [j.strip() for j in re.split(r'[,&]', judge_text) if j.strip()]
+            case.judges = [j.strip() for j in re.split(r"[,&]", judge_text) if j.strip()]
         # Also try akn-div judges
         akn_judges = re.findall(r'class="akn-div judges">(.*?)</div>', html)
         if akn_judges:
             for j_html in akn_judges:
-                j_clean = re.sub(r'<[^>]+>', '', j_html).strip()
+                j_clean = re.sub(r"<[^>]+>", "", j_html).strip()
                 # Remove title suffixes like ", J" or ", JA"
-                j_name = re.sub(r',\s*J[A]?$', '', j_clean).strip()
+                j_name = re.sub(r",\s*J[A]?$", "", j_clean).strip()
                 if j_name and j_name not in case.judges:
                     case.judges.append(j_name)
         if case.judges:
@@ -197,6 +199,7 @@ class KenyaLawScraper:
         # Extract advocate names from judgment text + metadata
         if case.judgment_text:
             from src.features.lawyer_features import extract_advocates_from_text
+
             adv = extract_advocates_from_text(case.judgment_text)
             case.plaintiff_advocates = adv["plaintiff_advocates"]
             case.defendant_advocates = adv["defendant_advocates"]
@@ -205,7 +208,7 @@ class KenyaLawScraper:
         # Also try "Attorneys" metadata field (available on many pages)
         attorneys_text = metadata.get("Attorneys", "")
         if attorneys_text and not case.advocate_names:
-            names = [n.strip() for n in re.split(r'[,;&]', attorneys_text) if n.strip()]
+            names = [n.strip() for n in re.split(r"[,;&]", attorneys_text) if n.strip()]
             case.advocate_names = names
 
         # If no outcome from metadata, try extracting from judgment text
@@ -217,15 +220,16 @@ class KenyaLawScraper:
     def _extract_dt_dd(self, html: str) -> dict[str, str]:
         """Extract all dt/dd metadata pairs from HTML."""
         pairs = re.findall(
-            r'<dt>\s*(.*?)\s*</dt>\s*<dd[^>]*>\s*(.*?)\s*</dd>',
-            html, re.DOTALL,
+            r"<dt>\s*(.*?)\s*</dt>\s*<dd[^>]*>\s*(.*?)\s*</dd>",
+            html,
+            re.DOTALL,
         )
         result = {}
         for dt, dd in pairs:
-            key = re.sub(r'<[^>]+>', '', dt).strip()
-            val = re.sub(r'<[^>]+>', '', dd).strip()
+            key = re.sub(r"<[^>]+>", "", dt).strip()
+            val = re.sub(r"<[^>]+>", "", dd).strip()
             # Clean up whitespace and non-breaking spaces
-            val = re.sub(r'\s+', ' ', val.replace('\xa0', ' ')).strip()
+            val = re.sub(r"\s+", " ", val.replace("\xa0", " ")).strip()
             if key and val:
                 result[key] = val
         return result
@@ -240,38 +244,42 @@ class KenyaLawScraper:
         # Try akn-judgmentBody first (newer cases with AKN markup)
         body = re.search(
             r'class="akn-judgmentBody">(.*?)</div>\s*(?:</div>\s*)*</section>',
-            html, re.DOTALL,
+            html,
+            re.DOTALL,
         )
         if not body:
             body = re.search(
                 r'class="akn-judgmentBody">(.*?)(?:<la-gutter|<div class="enrichments)',
-                html, re.DOTALL,
+                html,
+                re.DOTALL,
             )
         if body:
-            text = re.sub(r'<[^>]+>', ' ', body.group(1))
-            text = re.sub(r'\s+', ' ', text).strip()
+            text = re.sub(r"<[^>]+>", " ", body.group(1))
+            text = re.sub(r"\s+", " ", text).strip()
             return text
 
         # Standard layout: id="document_content" div
         body = re.search(
             r'id="document_content"[^>]*>(.*?)</div>\s*</div>\s*(?:<la-gutter|<div class="enrichments)',
-            html, re.DOTALL,
+            html,
+            re.DOTALL,
         )
         if body:
-            text = re.sub(r'<[^>]+>', ' ', body.group(1))
-            text = re.sub(r'\s+', ' ', text).strip()
+            text = re.sub(r"<[^>]+>", " ", body.group(1))
+            text = re.sub(r"\s+", " ", text).strip()
             return text
 
         # Broader fallback: document_content to end, trim at footer markers
         body = re.search(
             r'id="document_content"[^>]*>(.*?)$',
-            html, re.DOTALL,
+            html,
+            re.DOTALL,
         )
         if body:
-            text = re.sub(r'<[^>]+>', ' ', body.group(1))
-            text = re.sub(r'\s+', ' ', text).strip()
+            text = re.sub(r"<[^>]+>", " ", body.group(1))
+            text = re.sub(r"\s+", " ", text).strip()
             # Trim at footer markers
-            for marker in ['National Council for Law Reporting', 'ISO 9001', 'Creative Commons']:
+            for marker in ["National Council for Law Reporting", "ISO 9001", "Creative Commons"]:
                 idx = text.find(marker)
                 if idx > 0:
                     text = text[:idx].strip()
@@ -282,8 +290,8 @@ class KenyaLawScraper:
         # Last resort: akn-body content
         body = re.search(r'class="akn-body">(.*?)</section>', html, re.DOTALL)
         if body:
-            text = re.sub(r'<[^>]+>', ' ', body.group(1))
-            text = re.sub(r'\s+', ' ', text).strip()
+            text = re.sub(r"<[^>]+>", " ", body.group(1))
+            text = re.sub(r"\s+", " ", text).strip()
             return text
 
         return ""
@@ -298,42 +306,69 @@ class KenyaLawScraper:
             return ""
 
         # Focus on the last 20% of text (where disposition is stated)
-        tail = text[int(len(text) * 0.80):]
+        tail = text[int(len(text) * 0.80) :]
         tail_lower = tail.lower()
 
         # Ordered by specificity - check most specific patterns first
         outcome_patterns = [
             # Specific subject + outcome
-            (r'(?:application|suit|appeal|petition|case|charge)\s+(?:is\s+)?(?:hereby\s+)?dismissed', "Dismissed"),
-            (r'(?:application|suit|appeal|petition)\s+(?:is\s+)?(?:hereby\s+)?allowed', "Allowed"),
-            (r'(?:application|suit|appeal|petition)\s+(?:is\s+)?(?:hereby\s+)?struck\s+out', "Struck out"),
-            (r'(?:appeal|application)\s+(?:is\s+)?(?:hereby\s+)?(?:succeeds|successful)', "Allowed"),
-            (r'(?:appeal|application)\s+(?:is\s+)?(?:hereby\s+)?(?:fails|unsuccessful)', "Dismissed"),
-            (r'judgment\s+(?:is\s+)?(?:hereby\s+)?(?:entered|given)\s+for\s+the\s+plaintiff', "Allowed"),
-            (r'judgment\s+(?:is\s+)?(?:hereby\s+)?(?:entered|given)\s+for\s+the\s+defendant', "Dismissed"),
-            (r'(?:prayer|prayers)\s+(?:is|are)\s+(?:hereby\s+)?granted', "Allowed"),
-            (r'(?:prayer|prayers)\s+(?:is|are)\s+(?:hereby\s+)?refused', "Dismissed"),
+            (
+                r"(?:application|suit|appeal|petition|case|charge)\s+(?:is\s+)?(?:hereby\s+)?dismissed",
+                "Dismissed",
+            ),
+            (r"(?:application|suit|appeal|petition)\s+(?:is\s+)?(?:hereby\s+)?allowed", "Allowed"),
+            (
+                r"(?:application|suit|appeal|petition)\s+(?:is\s+)?(?:hereby\s+)?struck\s+out",
+                "Struck out",
+            ),
+            (
+                r"(?:appeal|application)\s+(?:is\s+)?(?:hereby\s+)?(?:succeeds|successful)",
+                "Allowed",
+            ),
+            (
+                r"(?:appeal|application)\s+(?:is\s+)?(?:hereby\s+)?(?:fails|unsuccessful)",
+                "Dismissed",
+            ),
+            (
+                r"judgment\s+(?:is\s+)?(?:hereby\s+)?(?:entered|given)\s+for\s+the\s+plaintiff",
+                "Allowed",
+            ),
+            (
+                r"judgment\s+(?:is\s+)?(?:hereby\s+)?(?:entered|given)\s+for\s+the\s+defendant",
+                "Dismissed",
+            ),
+            (r"(?:prayer|prayers)\s+(?:is|are)\s+(?:hereby\s+)?granted", "Allowed"),
+            (r"(?:prayer|prayers)\s+(?:is|are)\s+(?:hereby\s+)?refused", "Dismissed"),
             # Verb-first patterns (judge speaking)
-            (r'(?:i\s+)?(?:hereby\s+)?(?:dismiss|dismissing)\s+the\s+(?:application|suit|appeal|petition)', "Dismissed"),
-            (r'(?:i\s+)?(?:hereby\s+)?(?:allow|allowing|grant|granting)\s+the\s+(?:application|suit|appeal|petition)', "Allowed"),
+            (
+                r"(?:i\s+)?(?:hereby\s+)?(?:dismiss|dismissing)\s+the\s+(?:application|suit|appeal|petition)",
+                "Dismissed",
+            ),
+            (
+                r"(?:i\s+)?(?:hereby\s+)?(?:allow|allowing|grant|granting)\s+the\s+(?:application|suit|appeal|petition)",
+                "Allowed",
+            ),
             # Broader patterns - "it is hereby dismissed", "is hereby dismissed"
-            (r'(?:it\s+is|is)\s+hereby\s+dismissed', "Dismissed"),
-            (r'(?:it\s+is|is)\s+hereby\s+allowed', "Allowed"),
-            (r'hereby\s+dismissed', "Dismissed"),
-            (r'hereby\s+allowed', "Allowed"),
-            (r'hereby\s+upheld', "Dismissed"),  # "conviction upheld" = appeal dismissed
-            (r'hereby\s+set\s+aside', "Allowed"),  # "conviction set aside" = appeal allowed
-            (r'(?:conviction|sentence)\s+(?:is\s+)?(?:hereby\s+)?upheld', "Dismissed"),
-            (r'(?:conviction|sentence)\s+(?:is\s+)?(?:hereby\s+)?(?:set\s+aside|quashed)', "Allowed"),
+            (r"(?:it\s+is|is)\s+hereby\s+dismissed", "Dismissed"),
+            (r"(?:it\s+is|is)\s+hereby\s+allowed", "Allowed"),
+            (r"hereby\s+dismissed", "Dismissed"),
+            (r"hereby\s+allowed", "Allowed"),
+            (r"hereby\s+upheld", "Dismissed"),  # "conviction upheld" = appeal dismissed
+            (r"hereby\s+set\s+aside", "Allowed"),  # "conviction set aside" = appeal allowed
+            (r"(?:conviction|sentence)\s+(?:is\s+)?(?:hereby\s+)?upheld", "Dismissed"),
+            (
+                r"(?:conviction|sentence)\s+(?:is\s+)?(?:hereby\s+)?(?:set\s+aside|quashed)",
+                "Allowed",
+            ),
             # Partial outcomes
-            (r'allowed\s+in\s+part', "Allowed in part"),
-            (r'partially\s+(?:allowed|succeeded)', "Allowed in part"),
+            (r"allowed\s+in\s+part", "Allowed in part"),
+            (r"partially\s+(?:allowed|succeeded)", "Allowed in part"),
             # Consent / withdrawal
-            (r'(?:by\s+consent|consent\s+order|settled)', "Settled by consent"),
-            (r'withdrawn', "Withdrawn"),
+            (r"(?:by\s+consent|consent\s+order|settled)", "Settled by consent"),
+            (r"withdrawn", "Withdrawn"),
             # Standalone verbs as last resort (less reliable)
-            (r'\bis\s+dismissed\b', "Dismissed"),
-            (r'\bis\s+allowed\b', "Allowed"),
+            (r"\bis\s+dismissed\b", "Dismissed"),
+            (r"\bis\s+allowed\b", "Allowed"),
         ]
 
         for pattern, outcome in outcome_patterns:

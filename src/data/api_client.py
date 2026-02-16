@@ -12,15 +12,16 @@ Implements:
 import asyncio
 import logging
 import time
+from collections.abc import AsyncIterator
 from pathlib import Path
-from typing import Any, AsyncIterator
+from typing import Any
 
 import httpx
 from tenacity import (
     retry,
+    retry_if_exception_type,
     stop_after_attempt,
     wait_exponential,
-    retry_if_exception_type,
 )
 
 from configs.settings import settings
@@ -105,8 +106,7 @@ class TausiClient:
         """Raise if too many consecutive failures."""
         if self._consecutive_failures >= self._cb_threshold:
             raise CircuitBreakerOpen(
-                f"{self._consecutive_failures} consecutive failures. "
-                f"Pausing for {self._cb_pause}s."
+                f"{self._consecutive_failures} consecutive failures. Pausing for {self._cb_pause}s."
             )
 
     @retry(
@@ -128,7 +128,11 @@ class TausiClient:
             self._on_failure()
             logger.warning(
                 "Request failed: %s %s -> %s (failures: %d, rate: %.1f req/s)",
-                method, url, e, self._consecutive_failures, self._rate_limit,
+                method,
+                url,
+                e,
+                self._consecutive_failures,
+                self._rate_limit,
             )
             raise
 
@@ -221,12 +225,12 @@ class TausiClient:
             if url:
                 logger.info(
                     "Page %d: fetched %d decisions (total: %s)",
-                    page, len(results), data.get("count", "?"),
+                    page,
+                    len(results),
+                    data.get("count", "?"),
                 )
 
-    async def count_decisions(
-        self, court: str | None = None, year: int | None = None
-    ) -> int:
+    async def count_decisions(self, court: str | None = None, year: int | None = None) -> int:
         """Get the total count of decisions matching filters."""
         params: dict[str, Any] = {}
         if court:

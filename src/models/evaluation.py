@@ -17,16 +17,15 @@ from typing import Any
 
 import numpy as np
 import pandas as pd
-import shap
 from sklearn.metrics import (
     accuracy_score,
-    roc_auc_score,
     brier_score_loss,
+    classification_report,
+    confusion_matrix,
+    f1_score,
     precision_score,
     recall_score,
-    f1_score,
-    confusion_matrix,
-    classification_report,
+    roc_auc_score,
 )
 
 from configs.settings import settings
@@ -131,6 +130,8 @@ def compute_shap_explanations(
     else:
         X_sample = X
 
+    import shap
+
     explainer = shap.TreeExplainer(model)
     shap_values = explainer.shap_values(X_sample)
 
@@ -142,7 +143,7 @@ def compute_shap_explanations(
 
     mean_abs_shap = np.abs(shap_values).mean(axis=0)
     importance_ranking = sorted(
-        zip(feature_names, mean_abs_shap),
+        zip(feature_names, mean_abs_shap, strict=False),
         key=lambda x: x[1],
         reverse=True,
     )
@@ -200,18 +201,14 @@ def evaluate_model(
     result = {"metrics": metrics}
 
     if metadata_df is not None and group_column and group_column in metadata_df.columns:
-        fairness = compute_fairness(
-            y_true, y_probs, metadata_df[group_column].values
-        )
+        fairness = compute_fairness(y_true, y_probs, metadata_df[group_column].values)
         result["fairness"] = fairness
 
     # Confusion matrix
     y_pred = (y_probs >= 0.5).astype(int)
     cm = confusion_matrix(y_true, y_pred)
     result["confusion_matrix"] = cm.tolist()
-    result["classification_report"] = classification_report(
-        y_true, y_pred, output_dict=True
-    )
+    result["classification_report"] = classification_report(y_true, y_pred, output_dict=True)
 
     return result
 
@@ -233,24 +230,35 @@ def check_gates(metrics: dict) -> tuple[bool, str]:
     f = metrics.get("fairness", {})
 
     checks = [
-        ("accuracy", m.get("accuracy", 0) >= cfg.min_test_accuracy,
-         f"accuracy {m.get('accuracy', 0):.3f} >= {cfg.min_test_accuracy}"),
-        ("auc_roc", m.get("auc_roc", 0) >= cfg.min_test_auc_roc,
-         f"AUC-ROC {m.get('auc_roc', 0):.3f} >= {cfg.min_test_auc_roc}"),
-        ("brier", m.get("brier_score", 1) <= cfg.max_brier_score,
-         f"Brier {m.get('brier_score', 1):.3f} <= {cfg.max_brier_score}"),
+        (
+            "accuracy",
+            m.get("accuracy", 0) >= cfg.min_test_accuracy,
+            f"accuracy {m.get('accuracy', 0):.3f} >= {cfg.min_test_accuracy}",
+        ),
+        (
+            "auc_roc",
+            m.get("auc_roc", 0) >= cfg.min_test_auc_roc,
+            f"AUC-ROC {m.get('auc_roc', 0):.3f} >= {cfg.min_test_auc_roc}",
+        ),
+        (
+            "brier",
+            m.get("brier_score", 1) <= cfg.max_brier_score,
+            f"Brier {m.get('brier_score', 1):.3f} <= {cfg.max_brier_score}",
+        ),
     ]
 
     if f:
-        checks.append((
-            "fairness",
-            f.get("fairness_pass", False),
-            f"fairness delta {f.get('accuracy_delta_pp', 0):.1f}pp <= {cfg.max_fairness_delta_pp}pp",
-        ))
+        checks.append(
+            (
+                "fairness",
+                f.get("fairness_pass", False),
+                f"fairness delta {f.get('accuracy_delta_pp', 0):.1f}pp <= {cfg.max_fairness_delta_pp}pp",
+            )
+        )
 
     all_passed = all(passed for _, passed, _ in checks)
     lines = []
-    for name, passed, desc in checks:
+    for _name, passed, desc in checks:
         status = "PASS" if passed else "FAIL"
         lines.append(f"  [{status}] {desc}")
 

@@ -29,18 +29,22 @@ class PredictionRequest(BaseModel):
     num_judges: int = Field(default=1, ge=1, le=10)
     has_monetary_claim: bool = False
 
-    model_config = {"json_schema_extra": {
-        "examples": [{
-            "court_code": "kehc",
-            "filing_year": 2023,
-            "judge_id": "J. Smith",
-            "claim_amount_kes": 5_000_000,
-            "num_statutes_cited": 3,
-            "cites_dpa": True,
-            "num_judges": 1,
-            "has_monetary_claim": True,
-        }]
-    }}
+    model_config = {
+        "json_schema_extra": {
+            "examples": [
+                {
+                    "court_code": "kehc",
+                    "filing_year": 2023,
+                    "judge_id": "J. Smith",
+                    "claim_amount_kes": 5_000_000,
+                    "num_statutes_cited": 3,
+                    "cites_dpa": True,
+                    "num_judges": 1,
+                    "has_monetary_claim": True,
+                }
+            ]
+        }
+    }
 
 
 class PredictionResponse(BaseModel):

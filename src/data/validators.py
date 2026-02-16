@@ -7,7 +7,6 @@ the dataset.
 
 from datetime import date
 from enum import Enum
-from typing import Optional
 
 from pydantic import BaseModel, Field, field_validator, model_validator
 
@@ -54,8 +53,8 @@ class JudgeInfo(BaseModel):
     """Judge metadata from Tausi API."""
 
     short_name: str
-    full_name: Optional[str] = None
-    title: Optional[str] = None  # e.g., "Justice", "Lady Justice"
+    full_name: str | None = None
+    title: str | None = None  # e.g., "Justice", "Lady Justice"
 
 
 class TausiDecisionRaw(BaseModel):
@@ -67,18 +66,18 @@ class TausiDecisionRaw(BaseModel):
 
     # Core identifiers
     frbr_uri: str = Field(description="FRBR URI, e.g. /akn/ke/judgment/kehc/2020/123")
-    short_mnc: Optional[str] = Field(None, description="Short Medium-Neutral Citation")
-    full_mnc: Optional[str] = Field(None, description="Full Medium-Neutral Citation")
+    short_mnc: str | None = Field(None, description="Short Medium-Neutral Citation")
+    full_mnc: str | None = Field(None, description="Full Medium-Neutral Citation")
 
     # Court and classification
-    court: Optional[dict] = None  # {"code": "kehc", "name": "..."}
-    court_class: Optional[dict] = None
-    casetype: Optional[dict] = None  # {"name": "..."}
+    court: dict | None = None  # {"code": "kehc", "name": "..."}
+    court_class: dict | None = None
+    casetype: dict | None = None  # {"name": "..."}
 
     # Dates
-    filing_year: Optional[int] = None
-    delivery_year: Optional[int] = None
-    judgment_date: Optional[str] = None  # Will be parsed to date
+    filing_year: int | None = None
+    delivery_year: int | None = None
+    judgment_date: str | None = None  # Will be parsed to date
 
     # People
     judges: list[dict] = Field(default_factory=list)
@@ -88,11 +87,11 @@ class TausiDecisionRaw(BaseModel):
     cited_documents: list[dict] = Field(default_factory=list)
 
     # Content
-    content_url: Optional[str] = None  # URL to the full text
+    content_url: str | None = None  # URL to the full text
 
     # Metadata
-    county: Optional[dict] = None
-    area_of_law: Optional[dict] = None
+    county: dict | None = None
+    area_of_law: dict | None = None
     flags: list[dict] = Field(default_factory=list)
 
     @property
@@ -108,7 +107,7 @@ class TausiDecisionRaw(BaseModel):
         return self.frbr_uri.replace("/", "_").strip("_")
 
     @property
-    def court_code(self) -> Optional[str]:
+    def court_code(self) -> str | None:
         if self.court and "code" in self.court:
             return self.court["code"]
         return None
@@ -137,12 +136,12 @@ class CaseRecord(BaseModel):
     frbr_uri: str
     court_code: str
     filing_year: int = Field(ge=2000, le=2030)
-    judgment_date: Optional[date] = None
-    case_type: Optional[str] = None
+    judgment_date: date | None = None
+    case_type: str | None = None
 
     # Judges
     judge_names: list[str] = Field(default_factory=list)
-    primary_judge: Optional[str] = None
+    primary_judge: str | None = None
     num_judges: int = 0
 
     # Advocates - sourced from API advocates[] field AND extracted from PDF text
@@ -161,16 +160,16 @@ class CaseRecord(BaseModel):
     # Content
     has_pdf: bool = False
     has_text: bool = False
-    text_length: Optional[int] = None
-    text_path: Optional[str] = None
+    text_length: int | None = None
+    text_path: str | None = None
 
     # Outcome (populated by outcome_parser)
     outcome_label: OutcomeLabel = OutcomeLabel.UNDETERMINED
     outcome_confidence: float = 0.0
-    outcome_binary: Optional[int] = None  # 1=positive, 0=negative, None=excluded
+    outcome_binary: int | None = None  # 1=positive, 0=negative, None=excluded
 
     # Monetary
-    claim_amount_kes: Optional[float] = None
+    claim_amount_kes: float | None = None
     has_monetary_claim: bool = False
 
     @model_validator(mode="after")
@@ -179,9 +178,7 @@ class CaseRecord(BaseModel):
         if self.judge_names:
             self.primary_judge = self.judge_names[0]
         self.num_citations = len(self.cited_statutes)
-        self.cites_dpa = any(
-            "data protection" in s.lower() for s in self.cited_statutes
-        )
+        self.cites_dpa = any("data protection" in s.lower() for s in self.cited_statutes)
         # Advocate fields
         self.num_advocates = len(self.advocate_names)
         self.has_advocate_data = self.num_advocates > 0
@@ -222,7 +219,10 @@ class DatasetStats(BaseModel):
     def completeness_report(self) -> str:
         if self.total_cases == 0:
             return "No cases loaded."
-        pct = lambda n: f"{n}/{self.total_cases} ({100*n/self.total_cases:.1f}%)"
+
+        def pct(n):
+            return f"{n}/{self.total_cases} ({100 * n / self.total_cases:.1f}%)"
+
         return (
             f"Dataset: {self.total_cases} cases\n"
             f"  Text available: {pct(self.cases_with_text)}\n"

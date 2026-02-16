@@ -17,9 +17,7 @@ Usage:
 """
 
 import logging
-from pathlib import Path
 
-import numpy as np
 import pandas as pd
 from sklearn.decomposition import PCA
 from sklearn.feature_extraction.text import TfidfVectorizer
@@ -32,30 +30,64 @@ logger = logging.getLogger(__name__)
 # These are terms frequently appearing in Kenyan commercial litigation
 LEGAL_VOCABULARY = [
     # Procedural terms
-    "injunction", "interlocutory", "restraining order", "stay of execution",
-    "leave to appeal", "security for costs", "striking out", "summary judgment",
-    "default judgment", "consent order", "adjournment", "joinder",
-
+    "injunction",
+    "interlocutory",
+    "restraining order",
+    "stay of execution",
+    "leave to appeal",
+    "security for costs",
+    "striking out",
+    "summary judgment",
+    "default judgment",
+    "consent order",
+    "adjournment",
+    "joinder",
     # Commercial law
-    "breach of contract", "specific performance", "damages", "indemnity",
-    "liquidated damages", "quantum meruit", "unjust enrichment", "estoppel",
-    "fiduciary duty", "negligence", "misrepresentation", "fraud",
-
+    "breach of contract",
+    "specific performance",
+    "damages",
+    "indemnity",
+    "liquidated damages",
+    "quantum meruit",
+    "unjust enrichment",
+    "estoppel",
+    "fiduciary duty",
+    "negligence",
+    "misrepresentation",
+    "fraud",
     # Data protection (DPA 2019)
-    "data protection", "personal data", "data subject", "data controller",
-    "data processor", "consent", "data breach", "privacy",
-    "data commissioner", "right to erasure", "data transfer",
-
+    "data protection",
+    "personal data",
+    "data subject",
+    "data controller",
+    "data processor",
+    "consent",
+    "data breach",
+    "privacy",
+    "data commissioner",
+    "right to erasure",
+    "data transfer",
     # Kenyan statutory references
-    "civil procedure act", "evidence act", "companies act",
-    "insolvency act", "arbitration act", "law of contract act",
-    "constitution of kenya", "bill of rights", "fair hearing",
+    "civil procedure act",
+    "evidence act",
+    "companies act",
+    "insolvency act",
+    "arbitration act",
+    "law of contract act",
+    "constitution of kenya",
+    "bill of rights",
+    "fair hearing",
     "data protection act",
-
     # Outcome-related terms
-    "prima facie", "balance of convenience", "irreparable harm",
-    "triable issue", "arguable case", "status quo",
-    "with costs", "without costs", "each party to bear",
+    "prima facie",
+    "balance of convenience",
+    "irreparable harm",
+    "triable issue",
+    "arguable case",
+    "status quo",
+    "with costs",
+    "without costs",
+    "each party to bear",
 ]
 
 
@@ -78,6 +110,7 @@ class TextFeatureBuilder:
         """Lazy-load the sentence transformer model."""
         if self._embedder is None:
             from sentence_transformers import SentenceTransformer
+
             logger.info("Loading sentence-transformer model: %s", self.model_name)
             self._embedder = SentenceTransformer(self.model_name)
         return self._embedder
@@ -125,7 +158,9 @@ class TextFeatureBuilder:
             explained = sum(self._pca.explained_variance_ratio_)
             logger.info(
                 "PCA: %d -> %d components (%.1f%% variance explained)",
-                embeddings.shape[1], n_components, 100 * explained,
+                embeddings.shape[1],
+                n_components,
+                100 * explained,
             )
         else:
             reduced = self._pca.transform(embeddings)
@@ -163,7 +198,9 @@ class TextFeatureBuilder:
         else:
             matrix = self._tfidf.transform(raw_texts)
 
-        feature_names = [f"tfidf_{name.replace(' ', '_')}" for name in self._tfidf.get_feature_names_out()]
+        feature_names = [
+            f"tfidf_{name.replace(' ', '_')}" for name in self._tfidf.get_feature_names_out()
+        ]
         return pd.DataFrame(
             matrix.toarray(),
             index=case_ids,

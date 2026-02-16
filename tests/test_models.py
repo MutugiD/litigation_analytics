@@ -4,7 +4,7 @@ import numpy as np
 import pytest
 
 from src.models.calibration import CalibratedModel, reliability_diagram_data
-from src.models.evaluation import compute_metrics, compute_fairness, check_gates
+from src.models.evaluation import check_gates, compute_fairness, compute_metrics
 
 
 class TestComputeMetrics:
@@ -58,9 +58,9 @@ class TestCheckGates:
     def test_all_gates_pass(self):
         metrics = {
             "metrics": {
-                "accuracy": 0.65,
-                "auc_roc": 0.70,
-                "brier_score": 0.20,
+                "accuracy": 0.75,
+                "auc_roc": 0.75,
+                "brier_score": 0.18,
             }
         }
         passed, report = check_gates(metrics)

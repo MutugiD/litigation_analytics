@@ -1,8 +1,9 @@
 """Tests for outcome extraction from judgment text."""
 
 import pytest
-from src.features.outcome_parser import OutcomeParser
+
 from src.data.validators import OutcomeLabel
+from src.features.outcome_parser import OutcomeParser
 
 
 @pytest.fixture
@@ -94,8 +95,8 @@ class TestOutcomeParser:
     def test_batch_parse(self, parser):
         """Batch parsing processes multiple texts."""
         texts = {
-            "case_1": "The application is allowed with costs.",
-            "case_2": "The suit is dismissed.",
+            "case_1": "After considering all the evidence and submissions, the application is allowed with costs to the applicant.",
+            "case_2": "Having reviewed the pleadings and heard submissions from both parties, the suit is hereby dismissed with costs.",
             "case_3": "too short",
         }
         results = parser.batch_parse(texts)

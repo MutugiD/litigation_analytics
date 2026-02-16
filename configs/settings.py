@@ -5,9 +5,9 @@ No hardcoded constants scattered across the codebase.
 """
 
 from pathlib import Path
-from pydantic_settings import BaseSettings
-from pydantic import Field
 
+from pydantic import Field
+from pydantic_settings import BaseSettings
 
 # Project root (two levels up from this file)
 PROJECT_ROOT = Path(__file__).resolve().parent.parent

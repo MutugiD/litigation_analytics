@@ -20,7 +20,7 @@ import pandas as pd
 from sklearn.compose import ColumnTransformer
 from sklearn.impute import SimpleImputer
 from sklearn.linear_model import LogisticRegression
-from sklearn.metrics import accuracy_score, roc_auc_score, brier_score_loss
+from sklearn.metrics import accuracy_score, brier_score_loss, roc_auc_score
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import OneHotEncoder, StandardScaler
 
@@ -88,19 +88,25 @@ class MajorityClassifier:
 
 def build_preprocessing_pipeline() -> ColumnTransformer:
     """Build a sklearn ColumnTransformer for mixed feature types."""
-    numeric_transformer = Pipeline(steps=[
-        ("imputer", SimpleImputer(strategy="median")),
-        ("scaler", StandardScaler()),
-    ])
+    numeric_transformer = Pipeline(
+        steps=[
+            ("imputer", SimpleImputer(strategy="median")),
+            ("scaler", StandardScaler()),
+        ]
+    )
 
-    binary_transformer = Pipeline(steps=[
-        ("imputer", SimpleImputer(strategy="constant", fill_value=0)),
-    ])
+    binary_transformer = Pipeline(
+        steps=[
+            ("imputer", SimpleImputer(strategy="constant", fill_value=0)),
+        ]
+    )
 
-    categorical_transformer = Pipeline(steps=[
-        ("imputer", SimpleImputer(strategy="constant", fill_value="unknown")),
-        ("onehot", OneHotEncoder(handle_unknown="ignore", sparse_output=False)),
-    ])
+    categorical_transformer = Pipeline(
+        steps=[
+            ("imputer", SimpleImputer(strategy="constant", fill_value="unknown")),
+            ("onehot", OneHotEncoder(handle_unknown="ignore", sparse_output=False)),
+        ]
+    )
 
     return ColumnTransformer(
         transformers=[
@@ -174,31 +180,54 @@ def train_baselines(
     with mlflow.start_run(run_name="logistic_regression"):
         preprocessor = ColumnTransformer(
             transformers=[
-                ("num", Pipeline([
-                    ("imputer", SimpleImputer(strategy="median")),
-                    ("scaler", StandardScaler()),
-                ]), avail_numeric),
-                ("bin", Pipeline([
-                    ("imputer", SimpleImputer(strategy="constant", fill_value=0)),
-                ]), avail_binary),
-                ("cat", Pipeline([
-                    ("imputer", SimpleImputer(strategy="constant", fill_value="unknown")),
-                    ("onehot", OneHotEncoder(handle_unknown="ignore", sparse_output=False)),
-                ]), avail_cat),
+                (
+                    "num",
+                    Pipeline(
+                        [
+                            ("imputer", SimpleImputer(strategy="median")),
+                            ("scaler", StandardScaler()),
+                        ]
+                    ),
+                    avail_numeric,
+                ),
+                (
+                    "bin",
+                    Pipeline(
+                        [
+                            ("imputer", SimpleImputer(strategy="constant", fill_value=0)),
+                        ]
+                    ),
+                    avail_binary,
+                ),
+                (
+                    "cat",
+                    Pipeline(
+                        [
+                            ("imputer", SimpleImputer(strategy="constant", fill_value="unknown")),
+                            ("onehot", OneHotEncoder(handle_unknown="ignore", sparse_output=False)),
+                        ]
+                    ),
+                    avail_cat,
+                ),
             ],
             remainder="drop",
         )
 
-        pipeline = Pipeline([
-            ("preprocess", preprocessor),
-            ("classifier", LogisticRegression(
-                C=1.0,
-                penalty="l2",
-                solver="lbfgs",
-                max_iter=1000,
-                random_state=42,
-            )),
-        ])
+        pipeline = Pipeline(
+            [
+                ("preprocess", preprocessor),
+                (
+                    "classifier",
+                    LogisticRegression(
+                        C=1.0,
+                        penalty="l2",
+                        solver="lbfgs",
+                        max_iter=1000,
+                        random_state=42,
+                    ),
+                ),
+            ]
+        )
 
         pipeline.fit(X_train, y_train)
 

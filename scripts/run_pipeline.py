@@ -19,10 +19,10 @@ from pathlib import Path
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(PROJECT_ROOT))
 
-import numpy as np
-import pandas as pd
+import numpy as np  # noqa: E402
+import pandas as pd  # noqa: E402
 
-from configs.settings import settings
+from configs.settings import settings  # noqa: E402
 
 logging.basicConfig(
     level=logging.INFO,
@@ -34,6 +34,7 @@ logger = logging.getLogger("pipeline")
 # ---------------------------------------------------------------------------
 # Step 1: Data Collection
 # ---------------------------------------------------------------------------
+
 
 async def fetch_cases_from_api(max_pages: int = 50) -> list[dict]:
     """Fetch KEHC decisions from Tausi API for 2015-2023."""
@@ -83,9 +84,10 @@ def load_raw_decisions(raw_dir: Path) -> list[dict]:
 # Step 2: Validate and Build Case Records
 # ---------------------------------------------------------------------------
 
+
 def build_case_records(raw_decisions: list[dict]) -> pd.DataFrame:
     """Convert raw API responses to validated CaseRecords."""
-    from src.data.validators import TausiDecisionRaw, CaseRecord, OutcomeLabel
+    from src.data.validators import CaseRecord, TausiDecisionRaw
 
     records = []
     validation_errors = 0
@@ -115,7 +117,8 @@ def build_case_records(raw_decisions: list[dict]) -> pd.DataFrame:
 
     logger.info(
         "Built %d case records (%d validation errors)",
-        len(records), validation_errors,
+        len(records),
+        validation_errors,
     )
     return pd.DataFrame(records)
 
@@ -123,6 +126,7 @@ def build_case_records(raw_decisions: list[dict]) -> pd.DataFrame:
 # ---------------------------------------------------------------------------
 # Step 3: Parse Outcomes
 # ---------------------------------------------------------------------------
+
 
 def parse_outcomes(df: pd.DataFrame) -> pd.DataFrame:
     """Apply outcome parser to extract binary labels.
@@ -132,23 +136,31 @@ def parse_outcomes(df: pd.DataFrame) -> pd.DataFrame:
     from src.features.outcome_parser import parse_outcome
 
     outcomes = []
-    for _, row in df.iterrows():
+    for _, _row in df.iterrows():
         # Try to parse from text if available
         text = ""  # Would come from PDF extraction
-        result = parse_outcome(text) if text else {
-            "label": "UNDETERMINED",
-            "confidence": 0.0,
-        }
+        result = (
+            parse_outcome(text)
+            if text
+            else {
+                "label": "UNDETERMINED",
+                "confidence": 0.0,
+            }
+        )
         outcomes.append(result)
 
     df["outcome_label"] = [o["label"] for o in outcomes]
     df["outcome_confidence"] = [o["confidence"] for o in outcomes]
 
     # Map to binary
-    from src.data.validators import POSITIVE_OUTCOMES, NEGATIVE_OUTCOMES, OutcomeLabel
+    from src.data.validators import NEGATIVE_OUTCOMES, POSITIVE_OUTCOMES
+
     df["outcome_binary"] = df["outcome_label"].apply(
-        lambda x: 1 if x in {o.value for o in POSITIVE_OUTCOMES}
-        else (0 if x in {o.value for o in NEGATIVE_OUTCOMES} else None)
+        lambda x: (
+            1
+            if x in {o.value for o in POSITIVE_OUTCOMES}
+            else (0 if x in {o.value for o in NEGATIVE_OUTCOMES} else None)
+        )
     )
 
     labeled = df["outcome_binary"].notna().sum()
@@ -159,6 +171,7 @@ def parse_outcomes(df: pd.DataFrame) -> pd.DataFrame:
 # ---------------------------------------------------------------------------
 # Step 4: Generate Synthetic Data (for pipeline testing)
 # ---------------------------------------------------------------------------
+
 
 def generate_synthetic_data(n_cases: int = 600, seed: int = 42) -> pd.DataFrame:
     """Generate synthetic data that mimics real Kenyan court case structure.
@@ -171,14 +184,26 @@ def generate_synthetic_data(n_cases: int = 600, seed: int = 42) -> pd.DataFrame:
     """
     rng = np.random.RandomState(seed)
 
-    judges = [f"Justice_{chr(65+i)}" for i in range(15)]
+    judges = [f"Justice_{chr(65 + i)}" for i in range(15)]
     p_lawyers = [f"P_Advocate_{i}" for i in range(30)]
     d_lawyers = [f"D_Advocate_{i}" for i in range(30)]
 
     # Generate years with temporal distribution
-    years = rng.choice(range(2015, 2024), size=n_cases, p=[
-        0.08, 0.09, 0.10, 0.11, 0.12, 0.13, 0.13, 0.12, 0.12  # More recent = more cases
-    ])
+    years = rng.choice(
+        range(2015, 2024),
+        size=n_cases,
+        p=[
+            0.08,
+            0.09,
+            0.10,
+            0.11,
+            0.12,
+            0.13,
+            0.13,
+            0.12,
+            0.12,  # More recent = more cases
+        ],
+    )
 
     records = []
     for i in range(n_cases):
@@ -199,38 +224,44 @@ def generate_synthetic_data(n_cases: int = 600, seed: int = 42) -> pd.DataFrame:
         num_citations = rng.poisson(3)
         judgment_month = rng.randint(1, 13)
 
-        records.append({
-            "case_id": f"KEHC_{year}_{i:04d}",
-            "frbr_uri": f"/akn/ke/judgment/kehc/{year}/{i}",
-            "court_code": "kehc",
-            "filing_year": int(year),
-            "judgment_date": f"{year}-{judgment_month:02d}-15",
-            "primary_judge": judge,
-            "judge_names": [judge],
-            "num_judges": 1,
-            "advocate_names": [p_lawyer, d_lawyer],
-            "plaintiff_advocates": [p_lawyer],
-            "defendant_advocates": [d_lawyer],
-            "num_advocates": 2,
-            "has_advocate_data": True,
-            "cited_statutes": [f"Act_{j}" for j in range(num_citations)],
-            "num_citations": num_citations,
-            "cites_dpa": rng.random() < 0.05,
-            "has_pdf": True,
-            "has_text": True,
-            "text_length": text_length,
-            "outcome_label": "JUDGMENT_FOR_PLAINTIFF" if outcome == 1 else "JUDGMENT_FOR_DEFENDANT",
-            "outcome_confidence": 0.9,
-            "outcome_binary": outcome,
-            "claim_amount_kes": claim_amount if has_monetary else None,
-            "has_monetary_claim": has_monetary,
-        })
+        records.append(
+            {
+                "case_id": f"KEHC_{year}_{i:04d}",
+                "frbr_uri": f"/akn/ke/judgment/kehc/{year}/{i}",
+                "court_code": "kehc",
+                "filing_year": int(year),
+                "judgment_date": f"{year}-{judgment_month:02d}-15",
+                "primary_judge": judge,
+                "judge_names": [judge],
+                "num_judges": 1,
+                "advocate_names": [p_lawyer, d_lawyer],
+                "plaintiff_advocates": [p_lawyer],
+                "defendant_advocates": [d_lawyer],
+                "num_advocates": 2,
+                "has_advocate_data": True,
+                "cited_statutes": [f"Act_{j}" for j in range(num_citations)],
+                "num_citations": num_citations,
+                "cites_dpa": rng.random() < 0.05,
+                "has_pdf": True,
+                "has_text": True,
+                "text_length": text_length,
+                "outcome_label": "JUDGMENT_FOR_PLAINTIFF"
+                if outcome == 1
+                else "JUDGMENT_FOR_DEFENDANT",
+                "outcome_confidence": 0.9,
+                "outcome_binary": outcome,
+                "claim_amount_kes": claim_amount if has_monetary else None,
+                "has_monetary_claim": has_monetary,
+            }
+        )
 
     df = pd.DataFrame(records)
     logger.info(
         "Generated %d synthetic cases (%.1f%% plaintiff wins, %d-%d years)",
-        len(df), 100 * df["outcome_binary"].mean(),
-        df["filing_year"].min(), df["filing_year"].max(),
+        len(df),
+        100 * df["outcome_binary"].mean(),
+        df["filing_year"].min(),
+        df["filing_year"].max(),
     )
     return df
 
@@ -308,7 +339,9 @@ def scrape_cases(n_cases: int = 200) -> pd.DataFrame:
                 max_pages=min(10, (max_cases // 50) + 1),
             )
             all_cases.extend(cases)
-            logger.info("Year %d: scraped %d cases (running total: %d)", year, len(cases), len(all_cases))
+            logger.info(
+                "Year %d: scraped %d cases (running total: %d)", year, len(cases), len(all_cases)
+            )
 
     df = pd.DataFrame(all_cases)
     logger.info("Total scraped: %d cases", len(df))
@@ -316,8 +349,12 @@ def scrape_cases(n_cases: int = 200) -> pd.DataFrame:
     # Map outcomes to binary
     df["outcome_binary"] = df["outcome"].apply(map_outcome_to_binary)
     labeled = df["outcome_binary"].notna().sum()
-    logger.info("Outcome mapping: %d labeled / %d total (%.1f%%)",
-                labeled, len(df), 100 * labeled / len(df) if len(df) > 0 else 0)
+    logger.info(
+        "Outcome mapping: %d labeled / %d total (%.1f%%)",
+        labeled,
+        len(df),
+        100 * labeled / len(df) if len(df) > 0 else 0,
+    )
 
     # Log outcome distribution
     if "outcome" in df.columns:
@@ -364,7 +401,7 @@ def prepare_scraped_dataframe(df: pd.DataFrame) -> pd.DataFrame:
         if not text or not isinstance(text, str):
             return 0
         # Count references to Acts, Cap., Sections
-        acts = len(re.findall(r'\b(?:Act|Cap\.|Section)\b', text, re.IGNORECASE))
+        acts = len(re.findall(r"\b(?:Act|Cap\.|Section)\b", text, re.IGNORECASE))
         return min(acts, 50)  # cap at 50
 
     df["num_citations"] = df["judgment_text"].apply(count_citations)
@@ -373,7 +410,7 @@ def prepare_scraped_dataframe(df: pd.DataFrame) -> pd.DataFrame:
     def check_dpa(text):
         if not text or not isinstance(text, str):
             return False
-        return bool(re.search(r'Data\s+Protection\s+Act', text, re.IGNORECASE))
+        return bool(re.search(r"Data\s+Protection\s+Act", text, re.IGNORECASE))
 
     df["cites_dpa"] = df["judgment_text"].apply(check_dpa)
 
@@ -395,15 +432,17 @@ def prepare_scraped_dataframe(df: pd.DataFrame) -> pd.DataFrame:
     df["has_advocate_data"] = df["num_advocates"] > 0
 
     # Ensure primary_judge exists
-    if "primary_judge" not in df.columns or df["primary_judge"].isna().all():
-        if "judges" in df.columns:
-            df["primary_judge"] = df["judges"].apply(
-                lambda x: x[0] if isinstance(x, list) and x else "Unknown"
-            )
+    if (
+        "primary_judge" not in df.columns or df["primary_judge"].isna().all()
+    ) and "judges" in df.columns:
+        df["primary_judge"] = df["judges"].apply(
+            lambda x: x[0] if isinstance(x, list) and x else "Unknown"
+        )
 
     # For cases with text but no outcome, try text-based extraction
     if "judgment_text" in df.columns:
         from src.data.scraper import KenyaLawScraper
+
         _scraper = KenyaLawScraper()
         empty_outcome_mask = (df["outcome"] == "") & (df["text_length"] > 200)
         fixed = 0
@@ -421,7 +460,9 @@ def prepare_scraped_dataframe(df: pd.DataFrame) -> pd.DataFrame:
     labeled = df["outcome_binary"].notna().sum()
     logger.info(
         "Prepared scraped data: %d cases, %d labeled (%.1f%%), %d with advocates",
-        len(df), labeled, 100 * labeled / len(df) if len(df) > 0 else 0,
+        len(df),
+        labeled,
+        100 * labeled / len(df) if len(df) > 0 else 0,
         df["has_advocate_data"].sum(),
     )
     return df
@@ -430,6 +471,7 @@ def prepare_scraped_dataframe(df: pd.DataFrame) -> pd.DataFrame:
 # ---------------------------------------------------------------------------
 # Step 5: Feature Engineering
 # ---------------------------------------------------------------------------
+
 
 def engineer_features(df: pd.DataFrame) -> pd.DataFrame:
     """Build full feature matrix from case records."""
@@ -446,8 +488,12 @@ def engineer_features(df: pd.DataFrame) -> pd.DataFrame:
     before = len(features)
     features = features.dropna(subset=["outcome_binary"])
     features["outcome_binary"] = features["outcome_binary"].astype(int)
-    logger.info("Features: %d cases x %d columns (dropped %d unlabeled)",
-                len(features), len(features.columns), before - len(features))
+    logger.info(
+        "Features: %d cases x %d columns (dropped %d unlabeled)",
+        len(features),
+        len(features.columns),
+        before - len(features),
+    )
 
     return features
 
@@ -471,6 +517,7 @@ def temporal_split(df: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame, pd.Dat
 # ---------------------------------------------------------------------------
 # Step 6: Train Models
 # ---------------------------------------------------------------------------
+
 
 def train_all_models(
     train_df: pd.DataFrame,
@@ -503,7 +550,10 @@ def train_all_models(
     logger.info("Training Random Forest (Katz 2017, JES 2024)...")
     try:
         rf_model, rf_metrics = train_random_forest(
-            train_df, val_df, test_df, n_trials=n_trials,
+            train_df,
+            val_df,
+            test_df,
+            n_trials=n_trials,
         )
         all_results["random_forest"] = rf_metrics
     except Exception as e:
@@ -514,7 +564,9 @@ def train_all_models(
     logger.info("Training XGBoost tabular (JES 2024: top performer)...")
     try:
         xgb_model, xgb_metrics = train_xgboost(
-            train_df, val_df, test_df,
+            train_df,
+            val_df,
+            test_df,
             include_text=False,
             n_trials=n_trials,
         )
@@ -528,6 +580,7 @@ def train_all_models(
 # ---------------------------------------------------------------------------
 # Step 7: Report Results
 # ---------------------------------------------------------------------------
+
 
 def report_results(results: dict, test_df: pd.DataFrame) -> str:
     """Generate a comprehensive results report."""
@@ -576,9 +629,15 @@ def report_results(results: dict, test_df: pd.DataFrame) -> str:
     auc_pass = auc >= cfg.min_test_auc_roc
     brier_pass = brier <= cfg.max_brier_score
 
-    lines.append(f"  [{'PASS' if acc_pass else 'FAIL'}] Accuracy {acc:.4f} >= {cfg.min_test_accuracy} (Katz 70.2%, JES 72%)")
-    lines.append(f"  [{'PASS' if auc_pass else 'FAIL'}] AUC-ROC {auc:.4f} >= {cfg.min_test_auc_roc} (PILOT 0.83)")
-    lines.append(f"  [{'PASS' if brier_pass else 'FAIL'}] Brier {brier:.4f} <= {cfg.max_brier_score}")
+    lines.append(
+        f"  [{'PASS' if acc_pass else 'FAIL'}] Accuracy {acc:.4f} >= {cfg.min_test_accuracy} (Katz 70.2%, JES 72%)"
+    )
+    lines.append(
+        f"  [{'PASS' if auc_pass else 'FAIL'}] AUC-ROC {auc:.4f} >= {cfg.min_test_auc_roc} (PILOT 0.83)"
+    )
+    lines.append(
+        f"  [{'PASS' if brier_pass else 'FAIL'}] Brier {brier:.4f} <= {cfg.max_brier_score}"
+    )
     lines.append("")
 
     all_pass = acc_pass and auc_pass and brier_pass
@@ -592,11 +651,11 @@ def report_results(results: dict, test_df: pd.DataFrame) -> str:
     # Literature comparison
     lines.append("LITERATURE COMPARISON:")
     lines.append(f"  Our best:          {acc:.1%} accuracy, {auc:.4f} AUC")
-    lines.append(f"  Katz 2017 (SCOTUS): 70.2% accuracy (RF)")
-    lines.append(f"  JES 2024 (SCOTUS):  72.0% accuracy (XGBoost)")
-    lines.append(f"  Aletras 2016 (ECHR): 79.0% accuracy (SVM)")
-    lines.append(f"  PILOT 2024 (ECHR):   0.83 AUC")
-    lines.append(f"  LexEdge (commercial): 80-87% accuracy")
+    lines.append("  Katz 2017 (SCOTUS): 70.2% accuracy (RF)")
+    lines.append("  JES 2024 (SCOTUS):  72.0% accuracy (XGBoost)")
+    lines.append("  Aletras 2016 (ECHR): 79.0% accuracy (SVM)")
+    lines.append("  PILOT 2024 (ECHR):   0.83 AUC")
+    lines.append("  LexEdge (commercial): 80-87% accuracy")
     lines.append("")
     lines.append("=" * 70)
 
@@ -608,6 +667,7 @@ def report_results(results: dict, test_df: pd.DataFrame) -> str:
 # Main
 # ---------------------------------------------------------------------------
 
+
 async def main_async(args):
     """Async main for API data fetching."""
     decisions = await fetch_cases_from_api(max_pages=args.max_pages)
@@ -618,17 +678,21 @@ async def main_async(args):
 def main():
     parser = argparse.ArgumentParser(description="Litigation Analytics Training Pipeline")
     parser.add_argument("--scrape", action="store_true", help="Scrape data from kenyalaw.org")
-    parser.add_argument("--skip-download", action="store_true", help="Use cached data (scraped or API)")
+    parser.add_argument(
+        "--skip-download", action="store_true", help="Use cached data (scraped or API)"
+    )
     parser.add_argument("--synthetic", action="store_true", help="Use synthetic data for testing")
     parser.add_argument("--max-pages", type=int, default=50, help="Max pages per year from API")
     parser.add_argument("--n-trials", type=int, default=30, help="Optuna trials per model")
-    parser.add_argument("--n-cases", type=int, default=600, help="Number of cases (scrape or synthetic)")
+    parser.add_argument(
+        "--n-cases", type=int, default=600, help="Number of cases (scrape or synthetic)"
+    )
     args = parser.parse_args()
 
-    mode = "scrape" if args.scrape else (
-        "synthetic" if args.synthetic else (
-            "cached" if args.skip_download else "api"
-        )
+    mode = (
+        "scrape"
+        if args.scrape
+        else ("synthetic" if args.synthetic else ("cached" if args.skip_download else "api"))
     )
     logger.info("Starting litigation analytics training pipeline...")
     logger.info("Mode: %s, n_cases: %d", mode, args.n_cases)
@@ -665,8 +729,15 @@ def main():
     min_train = 20 if args.n_cases <= 300 else 50  # Relaxed for sample runs
     min_split = 5 if args.n_cases <= 300 else 10
     if len(train_df) < min_train or len(val_df) < min_split or len(test_df) < min_split:
-        logger.error("Insufficient data for training: train=%d, val=%d, test=%d (min: %d/%d/%d)",
-                      len(train_df), len(val_df), len(test_df), min_train, min_split, min_split)
+        logger.error(
+            "Insufficient data for training: train=%d, val=%d, test=%d (min: %d/%d/%d)",
+            len(train_df),
+            len(val_df),
+            len(test_df),
+            min_train,
+            min_split,
+            min_split,
+        )
         logger.error("Try --synthetic for pipeline testing, or scrape more data.")
         sys.exit(1)
 
