@@ -19,10 +19,12 @@ Usage:
     cases = scraper.scrape_kehc_cases(years=[2020, 2021, 2022], max_per_year=100)
 """
 
+import json
 import logging
 import re
 import time
 from dataclasses import asdict, dataclass, field
+from pathlib import Path
 
 import httpx
 
@@ -318,7 +320,7 @@ class KenyaLawScraper:
             ),
             (r"(?:application|suit|appeal|petition)\s+(?:is\s+)?(?:hereby\s+)?allowed", "Allowed"),
             (
-                r"(?:application|suit|appeal|petition)\s+(?:is\s+)?(?:hereby\s+)?struck\s+out",
+                r"(?:application|suit|appeal|petition)\s+(?:is\s+)?(?:hereby\s+)?struck\s+(?:out|off)",
                 "Struck out",
             ),
             (
@@ -339,14 +341,29 @@ class KenyaLawScraper:
             ),
             (r"(?:prayer|prayers)\s+(?:is|are)\s+(?:hereby\s+)?granted", "Allowed"),
             (r"(?:prayer|prayers)\s+(?:is|are)\s+(?:hereby\s+)?refused", "Dismissed"),
+            # Orders section markers common in Kenyan judgments
+            (r"orders?\s*:\s*.*?(?:application|suit|petition)\s+.*?dismissed", "Dismissed"),
+            (r"orders?\s*:\s*.*?(?:application|suit|petition)\s+.*?allowed", "Allowed"),
+            # "I find for the plaintiff/defendant"
+            (r"(?:i\s+)?find\s+for\s+the\s+plaintiff", "Allowed"),
+            (r"(?:i\s+)?find\s+for\s+the\s+defendant", "Dismissed"),
             # Verb-first patterns (judge speaking)
             (
-                r"(?:i\s+)?(?:hereby\s+)?(?:dismiss|dismissing)\s+the\s+(?:application|suit|appeal|petition)",
+                r"(?:i\s+)?(?:hereby\s+)?(?:dismiss|dismissing)\s+the\s+(?:application|suit|appeal|petition|claim)",
                 "Dismissed",
             ),
             (
-                r"(?:i\s+)?(?:hereby\s+)?(?:allow|allowing|grant|granting)\s+the\s+(?:application|suit|appeal|petition)",
+                r"(?:i\s+)?(?:hereby\s+)?(?:allow|allowing|grant|granting)\s+the\s+(?:application|suit|appeal|petition|claim)",
                 "Allowed",
+            ),
+            # "the claim/counterclaim succeeds/fails"
+            (
+                r"(?:claim|counterclaim|counter-claim)\s+(?:is\s+)?(?:hereby\s+)?(?:succeeds|allowed|granted)",
+                "Allowed",
+            ),
+            (
+                r"(?:claim|counterclaim|counter-claim)\s+(?:is\s+)?(?:hereby\s+)?(?:fails|dismissed|rejected)",
+                "Dismissed",
             ),
             # Broader patterns - "it is hereby dismissed", "is hereby dismissed"
             (r"(?:it\s+is|is)\s+hereby\s+dismissed", "Dismissed"),
@@ -363,8 +380,12 @@ class KenyaLawScraper:
             # Partial outcomes
             (r"allowed\s+in\s+part", "Allowed in part"),
             (r"partially\s+(?:allowed|succeeded)", "Allowed in part"),
+            (r"succeeds?\s+(?:in\s+part|partially)", "Allowed in part"),
             # Consent / withdrawal
-            (r"(?:by\s+consent|consent\s+order|settled)", "Settled by consent"),
+            (
+                r"(?:by\s+consent|consent\s+order|settled|consent\s+of\s+(?:the\s+)?parties)",
+                "Settled by consent",
+            ),
             (r"withdrawn", "Withdrawn"),
             # Standalone verbs as last resort (less reliable)
             (r"\bis\s+dismissed\b", "Dismissed"),
@@ -386,37 +407,105 @@ class KenyaLawScraper:
         years: list[int] | None = None,
         max_per_year: int = 100,
         max_pages: int = 10,
+        scraped_ids: set[str] | None = None,
+        save_dir: Path | None = None,
     ) -> list[dict]:
-        """Scrape KEHC cases for specified years.
+        """Scrape KEHC cases for specified years with resume support.
 
         Args:
             years: List of years to scrape. Default: 2015-2023.
             max_per_year: Maximum cases per year.
             max_pages: Maximum listing pages per year.
+            scraped_ids: Set of case_ids already scraped (for resume).
+            save_dir: If provided, incrementally save cases to this directory.
 
         Returns:
             List of case dicts ready for DataFrame conversion.
         """
         if years is None:
             years = list(range(2015, 2024))
+        if scraped_ids is None:
+            scraped_ids = set()
 
         all_cases = []
         for year in years:
-            logger.info("Scraping KEHC %d (max %d cases)...", year, max_per_year)
+            logger.info("Scraping KEHC %d (max %d new cases)...", year, max_per_year)
+            # Get ALL available links first, then filter out already-scraped
             links = self.get_all_case_links("KEHC", year, max_pages=max_pages)
 
-            # Limit to max_per_year
-            links = links[:max_per_year]
-            logger.info("Year %d: processing %d cases", year, len(links))
+            # Filter out already-scraped links BEFORE limiting
+            new_links = []
+            already_scraped = 0
+            for link in links:
+                uri_match = re.search(r"/akn/ke/judgment/(\w+)/(\d{4})/(\d+)", link)
+                if uri_match:
+                    cid = f"{uri_match.group(1).upper()}_{uri_match.group(2)}_{uri_match.group(3)}"
+                    if cid in scraped_ids:
+                        already_scraped += 1
+                    else:
+                        new_links.append(link)
 
-            for i, link in enumerate(links):
+            # Now limit to max_per_year NEW cases
+            new_links = new_links[:max_per_year]
+
+            logger.info(
+                "Year %d: %d new links to scrape (%d already scraped, %d total on site)",
+                year,
+                len(new_links),
+                already_scraped,
+                len(links),
+            )
+
+            for i, link in enumerate(new_links):
                 try:
                     case = self.parse_case_page(link)
-                    all_cases.append(asdict(case))
+                    case_dict = asdict(case)
+                    all_cases.append(case_dict)
+                    scraped_ids.add(case.case_id)
+
+                    # Incremental save every 50 cases
+                    if save_dir and len(all_cases) % 50 == 0:
+                        self._save_checkpoint(all_cases, save_dir)
+
                     if (i + 1) % 10 == 0:
-                        logger.info("  Year %d: %d/%d cases scraped", year, i + 1, len(links))
+                        logger.info(
+                            "  Year %d: %d/%d cases scraped (total: %d)",
+                            year,
+                            i + 1,
+                            len(new_links),
+                            len(all_cases),
+                        )
                 except Exception as e:
                     logger.warning("  Failed to parse %s: %s", link, e)
 
-        logger.info("Total scraped: %d cases across %d years", len(all_cases), len(years))
+        logger.info("Total scraped: %d new cases across %d years", len(all_cases), len(years))
+
+        # Final checkpoint
+        if save_dir and all_cases:
+            self._save_checkpoint(all_cases, save_dir)
+
         return all_cases
+
+    @staticmethod
+    def _save_checkpoint(cases: list[dict], save_dir: Path):
+        """Save incremental checkpoint of scraped cases."""
+        save_dir.mkdir(parents=True, exist_ok=True)
+        path = save_dir / "scrape_checkpoint.json"
+        with open(path, "w", encoding="utf-8") as f:
+            json.dump(cases, f, indent=2, ensure_ascii=False, default=str)
+        logger.info("Checkpoint saved: %d cases -> %s", len(cases), path)
+
+    @staticmethod
+    def load_existing_ids(path: Path) -> set[str]:
+        """Load case_ids from an existing scraped_cases.json file."""
+        if not path.exists():
+            return set()
+        try:
+            with open(path, encoding="utf-8") as f:
+                data = json.load(f)
+            ids = {r["case_id"] for r in data if r.get("case_id")}
+            logger.info("Loaded %d existing case IDs from %s", len(ids), path)
+            return ids
+        except Exception as e:
+            logger.warning("Could not load existing IDs from %s: %s", path, e)
+            return set()
