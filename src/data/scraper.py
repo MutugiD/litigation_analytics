@@ -90,10 +90,12 @@ class KenyaLawScraper:
     def __exit__(self, *args):
         self.close()
 
-    def _get(self, url: str) -> str:
+    def _get(self, url: str, raise_on_404: bool = True) -> str:
         """Fetch a URL with rate limiting."""
         time.sleep(self.delay)
         r = self.client.get(url)
+        if r.status_code == 404 and not raise_on_404:
+            return ""
         r.raise_for_status()
         return r.text
 
@@ -108,7 +110,9 @@ class KenyaLawScraper:
             /akn/ke/judgment/kehc/2022/16964/eng@2022-12-30
         """
         url = f"{BASE_URL}/judgments/{court}/{year}/?page={page}"
-        html = self._get(url)
+        html = self._get(url, raise_on_404=False)
+        if not html:
+            return []
 
         # Extract case links with the eng@date suffix
         pattern = rf"/akn/ke/judgment/{court.lower()}/{year}/\d+/eng@[\d-]+"
