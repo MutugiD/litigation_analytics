@@ -276,17 +276,25 @@ OUTCOME_MAP = {
     "granted": 1,
     "upheld": 1,
     "succeeded": 1,
+    "successful": 1,
+    "allowed in part": 1,  # partial win still counts as positive
     # Negative outcomes (defendant/respondent wins) -> 0
     "dismissed": 0,
     "struck out": 0,
+    "struck off": 0,
     "declined": 0,
     "rejected": 0,
     "refused": 0,
     "acquitted": 0,
     "convicted": 0,  # criminal - treat as negative from plaintiff perspective
+    "failed": 0,
+    "unsuccessful": 0,
     # Excluded
     "settled by consent": None,
     "withdrawn": None,
+    "file closed": None,
+    "court issues further directions": None,
+    "case to answer": None,
 }
 
 
@@ -302,49 +310,93 @@ def map_outcome_to_binary(outcome_str: str) -> int | None:
 
 
 def scrape_cases(n_cases: int = 200) -> pd.DataFrame:
-    """Scrape KEHC cases from new.kenyalaw.org.
+    """Scrape KEHC cases from new.kenyalaw.org with resume support.
 
-    Distributes cases across years 2015-2023, proportional to target.
+    Loads existing scraped data, skips already-downloaded cases,
+    and merges new cases into the dataset. Distributes target
+    across years 2015-2023.
     """
     from src.data.scraper import KenyaLawScraper
 
+    save_path = settings.data.raw_dir / "scraped_cases.json"
+
+    # Load existing data for resume
+    existing_df = None
+    existing_ids = KenyaLawScraper.load_existing_ids(save_path)
+    if existing_ids:
+        existing_df = pd.read_json(save_path)
+        logger.info(
+            "Resuming: %d cases already scraped, targeting %d total",
+            len(existing_ids),
+            n_cases,
+        )
+
+    # Calculate how many new cases we need
+    n_existing = len(existing_ids)
+    n_needed = max(0, n_cases - n_existing)
+
+    if n_needed == 0:
+        logger.info(
+            "Already have %d cases (target: %d). No new scraping needed.", n_existing, n_cases
+        )
+        if existing_df is not None:
+            return existing_df
+        return pd.read_json(save_path)
+
+    logger.info("Need %d new cases (have %d, target %d)", n_needed, n_existing, n_cases)
+
+    # Distribute needed cases across years
     years = list(range(2015, 2024))
-    per_year = max(5, n_cases // len(years))
-    # Give more to recent years (more data available)
+    per_year = max(5, n_needed // len(years))
     allocations = {}
-    remaining = n_cases
+    remaining = n_needed
     for y in years:
-        alloc = min(per_year + (5 if y >= 2020 else 0), remaining)
+        alloc = min(per_year + (10 if y >= 2020 else 0), remaining)
         allocations[y] = alloc
         remaining -= alloc
-    # Distribute remaining to latest years
     for y in reversed(years):
         if remaining <= 0:
             break
-        add = min(remaining, 20)
+        add = min(remaining, 30)
         allocations[y] += add
         remaining -= add
 
-    logger.info("Scraping plan: %s (total target: %d)", allocations, n_cases)
+    logger.info("Scraping plan: %s (need %d new cases)", allocations, n_needed)
 
     with KenyaLawScraper(delay=0.8) as scraper:
-        all_cases = []
+        all_new = []
         for year, max_cases in allocations.items():
             if max_cases <= 0:
                 continue
-            logger.info("Scraping year %d (target: %d cases)...", year, max_cases)
+            logger.info("Scraping year %d (target: %d new cases)...", year, max_cases)
+            # Paginate deep enough: need pages beyond what's already scraped
+            # Each page has ~50 links. Estimate pages already consumed.
+            already_for_year = sum(1 for cid in existing_ids if f"_{year}_" in cid)
+            pages_needed = (already_for_year + max_cases) // 50 + 2
             cases = scraper.scrape_kehc_cases(
                 years=[year],
                 max_per_year=max_cases,
-                max_pages=min(10, (max_cases // 50) + 1),
+                max_pages=min(30, pages_needed),
+                scraped_ids=existing_ids,
+                save_dir=settings.data.raw_dir,
             )
-            all_cases.extend(cases)
+            all_new.extend(cases)
             logger.info(
-                "Year %d: scraped %d cases (running total: %d)", year, len(cases), len(all_cases)
+                "Year %d: scraped %d new cases (batch total: %d)",
+                year,
+                len(cases),
+                len(all_new),
             )
 
-    df = pd.DataFrame(all_cases)
-    logger.info("Total scraped: %d cases", len(df))
+    # Merge with existing data
+    new_df = pd.DataFrame(all_new)
+    if existing_df is not None and not existing_df.empty:
+        df = pd.concat([existing_df, new_df], ignore_index=True)
+        df = df.drop_duplicates(subset=["case_id"], keep="last")
+    else:
+        df = new_df
+
+    logger.info("Total dataset: %d cases (%d new + %d existing)", len(df), len(all_new), n_existing)
 
     # Map outcomes to binary
     df["outcome_binary"] = df["outcome"].apply(map_outcome_to_binary)
@@ -360,11 +412,10 @@ def scrape_cases(n_cases: int = 200) -> pd.DataFrame:
     if "outcome" in df.columns:
         logger.info("Outcome distribution:\n%s", df["outcome"].value_counts().to_string())
 
-    # Save to disk for reuse
-    save_path = settings.data.raw_dir / "scraped_cases.json"
+    # Save merged dataset
     save_path.parent.mkdir(parents=True, exist_ok=True)
     df.to_json(save_path, orient="records", indent=2)
-    logger.info("Saved scraped data to %s", save_path)
+    logger.info("Saved %d cases to %s", len(df), save_path)
 
     return df
 
@@ -685,7 +736,7 @@ def main():
     parser.add_argument("--max-pages", type=int, default=50, help="Max pages per year from API")
     parser.add_argument("--n-trials", type=int, default=30, help="Optuna trials per model")
     parser.add_argument(
-        "--n-cases", type=int, default=600, help="Number of cases (scrape or synthetic)"
+        "--n-cases", type=int, default=2500, help="Target total cases (resumes from existing)"
     )
     args = parser.parse_args()
 
